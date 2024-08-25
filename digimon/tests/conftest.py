@@ -5,7 +5,6 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from httpx import AsyncClient, ASGITransport
 
-
 from typing import Any, Dict, Optional
 from pydantic_settings import SettingsConfigDict
 
@@ -39,10 +38,6 @@ def app_fixture():
 
 @pytest.fixture(name="client", scope="session")
 def client_fixture(app: FastAPI) -> AsyncClient:
-
-    # client = TestClient(app)
-    # yield client
-    # app.dependency_overrides.clear()
     return AsyncClient(transport=ASGITransport(app=app), base_url="http://localhost")
 
 
@@ -127,10 +122,41 @@ async def example_merchant_user1(
         return merchant
 
     merchant = models.DBMerchant(
-        name=name, user=user1, decription="Merchant Description", tax_id="0000000000000"
+        name=name, user=user1, description="Merchant Description", tax_id="0000000000000"
     )
 
     session.add(merchant)
     await session.commit()
     await session.refresh(merchant)
     return merchant
+
+
+# เพิ่ม Fixture สำหรับ DBItem
+@pytest_asyncio.fixture(name="item_user1")
+async def example_item_user1(
+    session: models.AsyncSession, merchant_user1: models.DBMerchant, user1: models.DBUser
+) -> models.DBItem:
+    name = "item1"
+
+    query = await session.exec(
+        models.select(models.DBItem)
+        .where(models.DBItem.name == name, models.DBItem.merchant_id == merchant_user1.id)
+        .limit(1)
+    )
+    item = query.one_or_none()
+    if item:
+        return item
+
+    item = models.DBItem(
+        name=name,
+        description="Item Description",
+        price=10.5,
+        tax=0.7,
+        merchant_id=merchant_user1.id,
+        user_id=user1.id,
+    )
+
+    session.add(item)
+    await session.commit()
+    await session.refresh(item)
+    return item
